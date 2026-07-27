@@ -1,0 +1,33 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# User Uploads & Generated Outputs
+uploads/*
+!uploads/.gitkeep
+static/plots/*
+!static/plots/.gitkeep
+forecast_plot.png
+
+# Environment Variables & Logs
+.env
+*.log
+
+# Operating System & IDE Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Loose root data files
+/*.csv
+!samples/*.csv

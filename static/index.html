@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrendCast — Universal AI Demand Forecasting</title>
+  <meta name="description" content="Upload any CSV or Excel time series file to auto-detect frequencies, train XGBoost models, and visualize future demand forecasts." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:            #060912;
+      --bg2:           #0c1121;
+      --surface:       rgba(255,255,255,0.038);
+      --surface-hover: rgba(255,255,255,0.06);
+      --border:        rgba(255,255,255,0.07);
+      --border-strong: rgba(255,255,255,0.13);
+      --primary:       #6366f1;
+      --primary-dim:   rgba(99,102,241,0.12);
+      --primary-ring:  rgba(99,102,241,0.3);
+      --primary-glow:  rgba(99,102,241,0.18);
+      --green:         #10b981;
+      --green-dim:     rgba(16,185,129,0.12);
+      --green-ring:    rgba(16,185,129,0.28);
+      --amber:         #f59e0b;
+      --amber-dim:     rgba(245,158,11,0.12);
+      --red:           #ef4444;
+      --red-dim:       rgba(239,68,68,0.1);
+      --text:          #f1f5f9;
+      --text-2:        #94a3b8;
+      --text-3:        #475569;
+      --text-4:        #2d3f55;
+      --radius:        14px;
+      --radius-sm:     9px;
+      --radius-lg:     20px;
+      --header-h:      64px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── Header ── */
+    .header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+      height: var(--header-h);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 32px;
+      background: rgba(6,9,18,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo-wrap { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0;
+      background: linear-gradient(135deg, #4f46e5 0%, #818cf8 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 2px 18px rgba(99,102,241,0.4);
+    }
+    .logo-text  { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+    .logo-sub   { font-size: 10.5px; color: var(--text-3); margin-top: 1px; }
+
+    .header-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 20px;
+      background: var(--primary-dim); border: 1px solid var(--primary-ring);
+      font-size: 11px; font-weight: 500; color: var(--primary);
+    }
+    .header-badge span { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); display: inline-block; }
+
+    /* ── Page wrapper ── */
+    .page {
+      padding-top: calc(var(--header-h) + 36px);
+      padding-bottom: 80px;
+      max-width: 980px;
+      margin: 0 auto;
+      padding-left: 24px;
+      padding-right: 24px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .hero h1 {
+      font-size: clamp(28px, 4vw, 38px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      background: linear-gradient(135deg, #f1f5f9 0%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
+    }
+    .hero p {
+      font-size: 14.5px;
+      color: var(--text-3);
+      max-width: 540px;
+      margin: 0 auto;
+      line-height: 1.65;
+    }
+
+    /* ── Samples Bar ── */
+    .samples-section {
+      margin-bottom: 28px;
+    }
+    .samples-label {
+      font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--text-3); text-align: center; margin-bottom: 12px;
+    }
+    .samples-grid {
+      display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+    }
+    .sample-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 14px;
+      cursor: pointer; transition: all .18s;
+      display: flex; align-items: center; gap: 10px; text-align: left;
+    }
+    .sample-card:hover {
+      background: var(--primary-dim); border-color: var(--primary-ring);
+      transform: translateY(-2px);
+    }
+    .sample-title { font-size: 12px; font-weight: 600; color: var(--text); }
+    .sample-sub   { font-size: 10px; color: var(--text-3); }
+    .sample-badge {
+      font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+      background: rgba(255,255,255,0.06); color: var(--text-2);
+    }
+
+    /* ── Upload zone ── */
+    .upload-section { margin-bottom: 40px; }
+
+    .drop-zone {
+      position: relative;
+      border: 2px dashed var(--border-strong);
+      border-radius: var(--radius-lg);
+      padding: 44px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .25s, background .25s, box-shadow .25s;
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .drop-zone::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 0%, var(--primary-glow) 0%, transparent 70%);
+      opacity: 0; transition: opacity .3s;
+      pointer-events: none;
+    }
+    .drop-zone:hover::before, .drop-zone.over::before { opacity: 1; }
+    .drop-zone:hover, .drop-zone.over {
+      border-color: var(--primary);
+      background: rgba(99,102,241,0.05);
+      box-shadow: 0 0 0 1px var(--primary-ring), 0 8px 40px rgba(99,102,241,0.12);
+    }
+    .drop-zone.over { border-style: solid; }
+
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+      width: 100%; height: 100%;
+    }
+
+    .drop-icon-wrap {
+      width: 60px; height: 60px; border-radius: 16px; margin: 0 auto 16px;
+      background: var(--primary-dim); border: 1px solid var(--primary-ring);
+      display: flex; align-items: center; justify-content: center; font-size: 26px;
+      box-shadow: 0 0 30px var(--primary-glow);
+      transition: transform .25s;
+    }
+    .drop-zone:hover .drop-icon-wrap { transform: translateY(-3px); }
+    .drop-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .drop-sub   { font-size: 12.5px; color: var(--text-3); margin-bottom: 16px; }
+    .drop-types {
+      display: flex; justify-content: center; gap: 6px; flex-wrap: wrap;
+    }
+    .type-tag {
+      padding: 3px 9px; border-radius: 6px; font-size: 10.5px; font-weight: 600;
+      letter-spacing: .04em; font-family: monospace;
+    }
+    .type-tag.csv  { background: rgba(99,102,241,0.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.25); }
+    .type-tag.xlsx { background: rgba(16,185,129,0.12); color: #6ee7b7;  border: 1px solid rgba(16,185,129,0.22); }
+    .type-tag.xls  { background: rgba(16,185,129,0.12); color: #6ee7b7;  border: 1px solid rgba(16,185,129,0.22); }
+
+    /* Advanced options */
+    .advanced-toggle {
+      text-align: center;
+      margin-top: 14px;
+    }
+    .adv-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-3); font-size: 11.5px; font-family: inherit;
+      display: inline-flex; align-items: center; gap: 5px;
+      transition: color .15s;
+    }
+    .adv-btn:hover { color: var(--text-2); }
+    .adv-btn .arrow { display: inline-block; transition: transform .2s; }
+    .adv-btn.open .arrow { transform: rotate(180deg); }
+
+    .adv-panel {
+      display: none; margin-top: 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 20px;
+      animation: fadeDown .2s ease;
+    }
+    .adv-panel.show { display: block; }
+    @keyframes fadeDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+    .adv-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .adv-field { flex: 1; min-width: 150px; }
+    .adv-field label { font-size: 10.5px; font-weight: 600; letter-spacing:.06em; text-transform:uppercase; color: var(--text-3); display: block; margin-bottom: 5px; }
+    .adv-field input {
+      width: 100%; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 7px 10px;
+      color: var(--text); font-size: 12.5px; font-family: inherit;
+      transition: border-color .15s;
+      outline: none;
+    }
+    .adv-field input:focus { border-color: var(--primary); }
+    .adv-field input::placeholder { color: var(--text-4); }
+    .adv-hint { font-size: 10px; color: var(--text-3); margin-top: 10px; }
+
+    /* ── Jobs grid ── */
+    .jobs-grid {
+      display: flex; flex-direction: column; gap: 28px;
+    }
+
+    /* ── Job card ── */
+    .job-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      animation: slideUp .32s ease forwards;
+      opacity: 0;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Card header */
+    .card-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 22px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-file {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .file-icon {
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+    }
+    .file-icon.csv  { background: var(--primary-dim); border: 1px solid var(--primary-ring); }
+    .file-icon.xlsx,
+    .file-icon.xls  { background: var(--green-dim);   border: 1px solid var(--green-ring); }
+
+    .file-name  { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+    .file-ext-badge {
+      display: inline-block; padding: 2px 7px; border-radius: 5px;
+      font-size: 9.5px; font-weight: 700; letter-spacing: .05em; font-family: monospace;
+      margin-left: 6px; vertical-align: middle;
+    }
+    .file-ext-badge.csv  { background: var(--primary-dim); color: #a5b4fc; }
+    .file-ext-badge.xlsx,
+    .file-ext-badge.xls  { background: var(--green-dim);   color: #6ee7b7; }
+
+    .card-status {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 500;
+    }
+    .card-status.running { background: rgba(245,158,11,.1); color: var(--amber); border: 1px solid rgba(245,158,11,.2); }
+    .card-status.done    { background: var(--green-dim);    color: var(--green); border: 1px solid var(--green-ring); }
+    .card-status.error   { background: var(--red-dim);      color: var(--red);   border: 1px solid rgba(239,68,68,.2); }
+
+    /* Spinner */
+    .spinner {
+      width: 10px; height: 10px; border: 2px solid rgba(245,158,11,0.3);
+      border-top-color: var(--amber); border-radius: 50%;
+      animation: spin .7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Card body — loading */
+    .card-loading {
+      padding: 44px 22px;
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
+    }
+    .load-spinner-lg {
+      width: 36px; height: 36px; border: 3px solid var(--border);
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin .85s linear infinite;
+    }
+    .load-label { font-size: 13px; color: var(--text-3); }
+    .load-sublabel { font-size: 11px; color: var(--text-4); }
+
+    /* Card body — error */
+    .card-error {
+      padding: 24px 22px;
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .error-icon {
+      width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+      background: var(--red-dim); border: 1px solid rgba(239,68,68,.2);
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .error-title { font-size: 12.5px; font-weight: 600; color: var(--red); margin-bottom: 4px; }
+    .error-msg   { font-size: 11.5px; color: var(--text-3); line-height: 1.6; }
+
+    /* Card body — result */
+    .card-result { padding: 22px; }
+
+    /* Stats row */
+    .stats-row {
+      display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap;
+    }
+    .stat-box {
+      flex: 1; min-width: 95px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 14px;
+    }
+    .stat-label { font-size: 9.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
+    .stat-value { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+    .stat-sub   { font-size: 9.5px; color: var(--text-3); margin-top: 2px; }
+
+    .freq-tag {
+      display: inline-block; padding: 2px 8px; border-radius: 6px;
+      font-size: 11px; font-weight: 600;
+    }
+    .freq-tag.hourly    { background: rgba(236,72,153,.15); color: #f472b6; }
+    .freq-tag.daily     { background: rgba(129,140,248,.15); color: #a5b4fc; }
+    .freq-tag.weekly    { background: rgba(251,191,36,.12);  color: #fde68a; }
+    .freq-tag.monthly   { background: rgba(16,185,129,.12);  color: #6ee7b7; }
+    .freq-tag.quarterly { background: rgba(56,189,248,.15); color: #38bdf8; }
+    .freq-tag.yearly    { background: rgba(168,85,247,.15); color: #c084fc; }
+
+    /* MAPE section */
+    .mape-section { margin-bottom: 22px; }
+    .section-title {
+      font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--text-3); margin-bottom: 12px;
+      display: flex; align-items: center; gap: 7px;
+    }
+    .section-title::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    .mape-bars { display: flex; flex-direction: column; gap: 10px; }
+    .mape-row {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .mape-label {
+      font-size: 11px; color: var(--text-2); width: 140px; flex-shrink: 0; text-align: right;
+    }
+    .mape-bar-wrap {
+      flex: 1; height: 8px; background: var(--bg2); border-radius: 4px; overflow: hidden;
+    }
+    .mape-bar-fill {
+      height: 100%; border-radius: 4px;
+      transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .mape-bar-fill.baseline { background: linear-gradient(90deg, #78350f, #f59e0b); }
+    .mape-bar-fill.model    { background: linear-gradient(90deg, #312e81, #6366f1); }
+    .mape-pct {
+      font-size: 11.5px; font-weight: 600; width: 48px; flex-shrink: 0; text-align: right;
+    }
+    .mape-pct.baseline { color: var(--amber); }
+    .mape-pct.model    { color: var(--primary); }
+
+    /* Improvement callout */
+    .improvement-box {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-radius: var(--radius-sm);
+      margin-bottom: 22px;
+    }
+    .improvement-box.win {
+      background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(16,185,129,0.04));
+      border: 1px solid var(--green-ring);
+    }
+    .improvement-box.loss {
+      background: rgba(245,158,11,0.06);
+      border: 1px solid rgba(245,158,11,0.2);
+    }
+    .improvement-left { display: flex; align-items: center; gap: 10px; }
+    .improvement-emoji { font-size: 22px; }
+    .improvement-title { font-size: 12.5px; font-weight: 600; margin-bottom: 2px; }
+    .improvement-sub   { font-size: 11px; color: var(--text-3); }
+    .improvement-pct-big {
+      font-size: 28px; font-weight: 800; letter-spacing: -0.03em;
+    }
+    .improvement-pct-big.win  { color: var(--green); }
+    .improvement-pct-big.loss { color: var(--amber); }
+
+    /* Chart area */
+    .chart-wrap {
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: #0c1121;
+      border: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .chart-wrap img {
+      width: 100%; display: block;
+    }
+    .chart-placeholder {
+      height: 200px; display: flex; align-items: center; justify-content: center;
+      color: var(--text-4); font-size: 12px;
+    }
+
+    /* Details toggle */
+    .details-toggle {
+      width: 100%; background: none; border: none;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border-radius: var(--radius-sm);
+      cursor: pointer; color: var(--text-3); font-family: inherit; font-size: 11.5px;
+      transition: background .15s, color .15s;
+    }
+    .details-toggle:hover { background: var(--surface-hover); color: var(--text-2); }
+    .details-toggle .arr { transition: transform .2s; font-size: 10px; }
+    .details-toggle.open .arr { transform: rotate(180deg); }
+
+    .details-body {
+      display: none; padding: 10px 14px 6px;
+      animation: fadeDown .18s ease;
+    }
+    .details-body.show { display: block; }
+    .details-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      margin-bottom: 8px; font-size: 11.5px;
+    }
+    .details-key   { color: var(--text-3); width: 110px; flex-shrink: 0; }
+    .details-value { color: var(--text-2); }
+    .feature-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .chip {
+      padding: 2px 7px; border-radius: 5px;
+      background: var(--primary-dim); border: 1px solid rgba(99,102,241,0.18);
+      color: #a5b4fc; font-size: 10px; font-family: monospace;
+    }
+
+    /* Download button */
+    .dl-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 6px 12px; border-radius: var(--radius-sm);
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text-2); font-size: 11px; font-family: inherit;
+      cursor: pointer; text-decoration: none; transition: all .15s;
+    }
+    .dl-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-strong); }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center; padding: 50px 24px;
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+    }
+    .empty-glow {
+      width: 76px; height: 76px; border-radius: 22px;
+      background: linear-gradient(135deg, rgba(79,70,229,.15), rgba(129,140,248,.06));
+      border: 1px solid rgba(129,140,248,.18);
+      display: flex; align-items: center; justify-content: center; font-size: 30px;
+      box-shadow: 0 0 50px rgba(99,102,241,.08);
+    }
+    .empty-title { font-size: 15.5px; font-weight: 600; color: var(--text-2); }
+    .empty-sub   { font-size: 13px; color: var(--text-3); max-width: 380px; line-height: 1.65; }
+
+    /* ── Toasts ── */
+    #toasts {
+      position: fixed; bottom: 24px; right: 24px;
+      display: flex; flex-direction: column; gap: 8px; z-index: 999;
+    }
+    .toast {
+      padding: 10px 15px; border-radius: var(--radius-sm);
+      font-size: 12.5px; font-weight: 500;
+      display: flex; align-items: center; gap: 8px; max-width: 340px;
+      backdrop-filter: blur(20px);
+      animation: slideToast .25s ease;
+    }
+    @keyframes slideToast { from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); } }
+    .toast.ok  { background: rgba(16,185,129,.15); border: 1px solid rgba(16,185,129,.25); color: var(--green); }
+    .toast.err { background: rgba(239,68,68,.14);  border: 1px solid rgba(239,68,68,.22);  color: var(--red); }
+    .toast.inf { background: rgba(99,102,241,.14); border: 1px solid rgba(99,102,241,.25); color: var(--primary); }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="header">
+  <div class="logo-wrap">
+    <div class="logo-icon">📈</div>
+    <div>
+      <div class="logo-text">TrendCast</div>
+      <div class="logo-sub">Universal AI Demand Forecasting</div>
+    </div>
+  </div>
+  <div class="header-badge">
+    <span></span> Adaptive Engine
+  </div>
+</header>
+
+<!-- ── Page ── -->
+<main class="page">
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>Turn any time series data<br/>into accurate demand forecasts</h1>
+    <p>Upload any CSV or Excel file — whether it's hourly, daily, weekly, or monthly. TrendCast auto-detects dates, aggregates transactions, engineers lag features, and trains XGBoost to forecast future trends.</p>
+  </div>
+
+  <!-- Samples Section -->
+  <div class="samples-section">
+    <div class="samples-label">⚡ Try a Sample Dataset</div>
+    <div class="samples-grid" id="samplesGrid">
+      <div class="sample-card" onclick="runSample('monthly_car_sales')">
+        <div>
+          <div class="sample-title">🚗 Car Sales</div>
+          <div class="sample-sub">108 monthly observations</div>
+        </div>
+        <span class="sample-badge">Monthly</span>
+      </div>
+      <div class="sample-card" onclick="runSample('coffee_shop_sales')">
+        <div>
+          <div class="sample-title">☕ Coffee Orders</div>
+          <div class="sample-sub">3,600+ orders aggregated daily</div>
+        </div>
+        <span class="sample-badge">Daily</span>
+      </div>
+      <div class="sample-card" onclick="runSample('retailers_sales')">
+        <div>
+          <div class="sample-title">🏬 Retail Sales</div>
+          <div class="sample-sub">332 monthly sales index rows</div>
+        </div>
+        <span class="sample-badge">Monthly</span>
+      </div>
+      <div class="sample-card" onclick="runSample('house_property_sales')">
+        <div>
+          <div class="sample-title">🏡 Property Sales</div>
+          <div class="sample-sub">51 quarterly property points</div>
+        </div>
+        <span class="sample-badge">Quarterly</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload -->
+  <div class="upload-section">
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" multiple />
+      <div class="drop-icon-wrap">📂</div>
+      <div class="drop-title">Drop your CSV or Excel files here</div>
+      <div class="drop-sub">or click to browse — multiple files supported</div>
+      <div class="drop-types">
+        <span class="type-tag csv">.CSV</span>
+        <span class="type-tag xlsx">.XLSX</span>
+        <span class="type-tag xls">.XLS</span>
+      </div>
+    </div>
+
+    <div class="advanced-toggle">
+      <button class="adv-btn" id="advToggle" onclick="toggleAdv()">
+        ⚙ Custom Column or Test Size Overrides <span class="arrow">▾</span>
+      </button>
+    </div>
+    <div class="adv-panel" id="advPanel">
+      <div class="adv-row">
+        <div class="adv-field">
+          <label>Date Column</label>
+          <input type="text" id="dateColInput" placeholder="Auto-detected if empty" />
+        </div>
+        <div class="adv-field">
+          <label>Value / Target Column</label>
+          <input type="text" id="targetColInput" placeholder="Auto-detected if empty" />
+        </div>
+        <div class="adv-field">
+          <label>Holdout Test Size (Periods)</label>
+          <input type="number" id="testSizeInput" placeholder="Adaptive by default" />
+        </div>
+      </div>
+      <div class="adv-hint">ℹ TrendCast automatically auto-detects columns and adaptive test sizes if fields are left empty.</div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="resultsArea">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-glow">🔮</div>
+      <div class="empty-title">No forecasts generated yet</div>
+      <div class="empty-sub">Click a sample dataset above or drag & drop your CSV / Excel file to generate your first forecast.</div>
+    </div>
+    <div class="jobs-grid" id="jobsGrid"></div>
+  </div>
+
+</main>
+
+<div id="toasts"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+const jobs = new Map();
+let pollTimer = null;
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(String(s)));
+  return d.innerHTML;
+}
+
+function ext(filename) {
+  return filename.slice(filename.lastIndexOf('.')).toLowerCase().replace('.','');
+}
+
+function fileIcon(filename) {
+  const e = ext(filename);
+  return e === 'csv' ? '📋' : '📊';
+}
+
+function capFirst(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+function toast(msg, type = 'inf') {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  const icons = { ok: '✓', err: '✕', inf: '·' };
+  t.innerHTML = `<span>${icons[type] || '·'}</span><span>${escHtml(msg)}</span>`;
+  c.appendChild(t);
+  setTimeout(() => {
+    t.style.transition = 'opacity .25s, transform .25s';
+    t.style.opacity = '0';
+    t.style.transform = 'translateY(6px)';
+    setTimeout(() => t.remove(), 260);
+  }, 4000);
+}
+
+function toggleAdv() {
+  const btn = document.getElementById('advToggle');
+  const panel = document.getElementById('advPanel');
+  btn.classList.toggle('open');
+  panel.classList.toggle('show');
+}
+
+// ── Drop Zone ──────────────────────────────────────────────────────────────────
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('over');
+  if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files.length) uploadFiles(e.target.files);
+  fileInput.value = '';
+});
+
+const ALLOWED = new Set(['.csv','.xlsx','.xls']);
+
+function uploadFiles(fileList) {
+  Array.from(fileList).forEach(f => {
+    const e = f.name.slice(f.name.lastIndexOf('.')).toLowerCase();
+    if (!ALLOWED.has(e)) {
+      toast(`"${f.name}" is not a supported type (.csv, .xlsx, .xls)`, 'err');
+      return;
+    }
+    startJob(f);
+  });
+}
+
+// ── Run Sample Dataset ──
+async function runSample(sampleId) {
+  const tempId = 'pending-' + Date.now();
+  const cardEl = createCard(tempId, sampleId + '.csv', 'running');
+  jobs.set(tempId, { filename: sampleId, status: 'running', result: null, error: null, cardEl });
+  showGrid();
+
+  try {
+    const res = await fetch(`/api/analyze_sample/${sampleId}`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) {
+      updateCard(cardEl, { status: 'error', filename: sampleId, error: data.error });
+      toast(data.error, 'err');
+      return;
+    }
+    jobs.delete(tempId);
+    jobs.set(data.job_id, { filename: data.filename, status: 'running', result: null, error: null, cardEl });
+    cardEl.dataset.jobId = data.job_id;
+    toast(`Analyzing ${data.filename}…`, 'inf');
+    startPolling();
+  } catch (err) {
+    updateCard(cardEl, { status: 'error', filename: sampleId, error: err.message });
+  }
+}
+
+// ── Job Execution ──────────────────────────────────────────────────────────────
+async function startJob(file) {
+  const dateCol   = document.getElementById('dateColInput').value.trim() || null;
+  const targetCol = document.getElementById('targetColInput').value.trim() || null;
+  const testSize  = document.getElementById('testSizeInput').value.trim() || null;
+
+  const tempId = 'pending-' + Date.now();
+  const cardEl = createCard(tempId, file.name, 'running');
+  jobs.set(tempId, { filename: file.name, status: 'running', result: null, error: null, cardEl });
+  showGrid();
+
+  const fd = new FormData();
+  fd.append('file', file);
+  if (dateCol)   fd.append('date_col',   dateCol);
+  if (targetCol) fd.append('target_col', targetCol);
+  if (testSize)  fd.append('test_size',  testSize);
+
+  let jobId;
+  try {
+    const res  = await fetch('/api/analyze', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) {
+      jobs.delete(tempId);
+      updateCard(cardEl, { status: 'error', filename: file.name, error: data.error || 'Upload failed.' });
+      toast(data.error || 'Upload failed', 'err');
+      return;
+    }
+    jobId = data.job_id;
+  } catch (err) {
+    jobs.delete(tempId);
+    updateCard(cardEl, { status: 'error', filename: file.name, error: 'Network error: ' + err.message });
+    toast('Network error', 'err');
+    return;
+  }
+
+  jobs.delete(tempId);
+  jobs.set(jobId, { filename: file.name, status: 'running', result: null, error: null, cardEl });
+  cardEl.dataset.jobId = jobId;
+
+  toast(`Analyzing ${file.name}…`, 'inf');
+  startPolling();
+}
+
+function startPolling() {
+  if (pollTimer) return;
+  pollTimer = setInterval(pollAll, 1300);
+}
+
+async function pollAll() {
+  let anyRunning = false;
+  for (const [jobId, job] of jobs) {
+    if (jobId.startsWith('pending-') || job.status !== 'running') continue;
+    anyRunning = true;
+    try {
+      const res  = await fetch(`/api/status/${jobId}`);
+      const data = await res.json();
+      if (!res.ok) continue;
+      if (data.status !== 'running') {
+        job.status = data.status;
+        job.result = data.result;
+        job.error  = data.error;
+        updateCard(job.cardEl, data);
+        if (data.status === 'done')  toast(`✓ ${job.filename} forecast ready`, 'ok');
+        if (data.status === 'error') toast(`✕ ${job.filename}: ${data.error}`, 'err');
+      }
+    } catch (_) {}
+  }
+  const running = [...jobs.values()].some(j => j.status === 'running');
+  if (!running) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+// ── Rendering ──────────────────────────────────────────────────────────────────
+function showGrid() {
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('jobsGrid').style.display   = 'flex';
+}
+
+function createCard(id, filename, status) {
+  const grid = document.getElementById('jobsGrid');
+  const e    = ext(filename);
+  const card = document.createElement('div');
+  card.className = 'job-card';
+  card.dataset.jobId = id;
+  card.innerHTML = `
+    <div class="card-head">
+      <div class="card-file">
+        <div class="file-icon ${e}">${fileIcon(filename)}</div>
+        <div>
+          <div class="file-name">
+            ${escHtml(filename.replace(/\.[^.]+$/, ''))}
+            <span class="file-ext-badge ${e}">.${e.toUpperCase()}</span>
+          </div>
+        </div>
+      </div>
+      <div class="card-status running">
+        <div class="spinner"></div> Analyzing
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-loading">
+        <div class="load-spinner-lg"></div>
+        <div class="load-label">Building forecast model…</div>
+        <div class="load-sublabel">Detecting frequency · Aggregating duplicates · Training XGBoost</div>
+      </div>
+    </div>`;
+  grid.insertBefore(card, grid.firstChild);
+  return card;
+}
+
+function updateCard(cardEl, job) {
+  const statusEl = cardEl.querySelector('.card-status');
+  if (job.status === 'done') {
+    statusEl.className = 'card-status done';
+    statusEl.innerHTML = '✓ Complete';
+  } else if (job.status === 'error') {
+    statusEl.className = 'card-status error';
+    statusEl.innerHTML = '✕ Error';
+  }
+
+  const bodyEl = cardEl.querySelector('.card-body');
+  if (job.status === 'done' && job.result) {
+    bodyEl.innerHTML = renderResult(job.result);
+    requestAnimationFrame(() => {
+      const r = job.result;
+      const max = Math.max(r.mape_baseline, r.mape_model);
+      const bFill = bodyEl.querySelector('.mape-bar-fill.baseline');
+      const mFill = bodyEl.querySelector('.mape-bar-fill.model');
+      if (bFill) bFill.style.width = ((r.mape_baseline / max) * 100) + '%';
+      if (mFill) mFill.style.width = ((r.mape_model    / max) * 100) + '%';
+    });
+  } else if (job.status === 'error') {
+    bodyEl.innerHTML = `
+      <div class="card-error">
+        <div class="error-icon">⚠️</div>
+        <div>
+          <div class="error-title">Analysis failed</div>
+          <div class="error-msg">${escHtml(job.error || 'Unknown error.')}</div>
+        </div>
+      </div>`;
+  }
+}
+
+function renderResult(r) {
+  const freqClass = r.frequency || 'monthly';
+
+  let improvHtml;
+  if (r.improvement_pct !== null && r.improvement_pct !== undefined) {
+    improvHtml = `
+      <div class="improvement-box win">
+        <div class="improvement-left">
+          <div class="improvement-emoji">🎯</div>
+          <div>
+            <div class="improvement-title">XGBoost Outperformed Naive Baseline</div>
+            <div class="improvement-sub">Model reduced prediction error by ${r.improvement_pct}% relative to simple guessing.</div>
+          </div>
+        </div>
+        <div class="improvement-pct-big win">${r.improvement_pct}%</div>
+      </div>`;
+  } else {
+    improvHtml = `
+      <div class="improvement-box loss">
+        <div class="improvement-left">
+          <div class="improvement-emoji">📉</div>
+          <div>
+            <div class="improvement-title">Baseline Held Its Own</div>
+            <div class="improvement-sub">Data is strongly trending or highly smooth — simple last-value guess was sufficient.</div>
+          </div>
+        </div>
+        <div class="improvement-pct-big loss">—</div>
+      </div>`;
+  }
+
+  const chipHtml = (r.features || []).map(f => `<span class="chip">${escHtml(f)}</span>`).join('');
+
+  return `
+    <div class="card-result">
+
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-label">Rows Loaded</div>
+          <div class="stat-value">${r.row_count.toLocaleString()}</div>
+          <div class="stat-sub">${r.usable_rows.toLocaleString()} usable points</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Frequency</div>
+          <div class="stat-value"><span class="freq-tag ${freqClass}">${capFirst(r.frequency)}</span></div>
+          <div class="stat-sub">auto-detected</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Test Periods</div>
+          <div class="stat-value">${r.test_size}</div>
+          <div class="stat-sub">held out for testing</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">XGBoost MAPE</div>
+          <div class="stat-value" style="color:var(--primary)">${r.mape_model}%</div>
+          <div class="stat-sub">lower is better</div>
+        </div>
+      </div>
+
+      <div class="mape-section">
+        <div class="section-title">Prediction Error Comparison (MAPE)</div>
+        <div class="mape-bars">
+          <div class="mape-row">
+            <div class="mape-label">Naive Baseline (Last Value)</div>
+            <div class="mape-bar-wrap">
+              <div class="mape-bar-fill baseline" style="width:0%"></div>
+            </div>
+            <div class="mape-pct baseline">${r.mape_baseline}%</div>
+          </div>
+          <div class="mape-row">
+            <div class="mape-label">XGBoost AI Forecast</div>
+            <div class="mape-bar-wrap">
+              <div class="mape-bar-fill model" style="width:0%"></div>
+            </div>
+            <div class="mape-pct model">${r.mape_model}%</div>
+          </div>
+        </div>
+      </div>
+
+      ${improvHtml}
+
+      <div class="chart-wrap">
+        <img src="${escHtml(r.plot_url)}" alt="Forecast chart" loading="lazy"
+             onerror="this.parentElement.innerHTML='<div class=\\'chart-placeholder\\'>Chart rendering error</div>'" />
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <button class="details-toggle" id="dtoggle-${Date.now()}"
+                onclick="toggleDetails(this)">
+          <span>Technical details & features</span>
+          <span class="arr">▾</span>
+        </button>
+        <a href="${escHtml(r.plot_url)}" download class="dl-btn">Download Chart</a>
+      </div>
+
+      <div class="details-body" style="display:none">
+        <div class="details-row">
+          <div class="details-key">Date Column</div>
+          <div class="details-value"><code>${escHtml(r.date_col)}</code></div>
+        </div>
+        <div class="details-row">
+          <div class="details-key">Target Column</div>
+          <div class="details-value"><code>${escHtml(r.target_col)}</code></div>
+        </div>
+        <div class="details-row">
+          <div class="details-key">Features Engineered</div>
+          <div class="details-value"><div class="feature-chips">${chipHtml}</div></div>
+        </div>
+      </div>
+
+    </div>`;
+}
+
+function toggleDetails(btn) {
+  btn.classList.toggle('open');
+  const body = btn.closest('.card-result').querySelector('.details-body');
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    body.classList.add('show');
+  } else {
+    body.style.display = 'none';
+    body.classList.remove('show');
+  }
+}
+</script>
+</body>
+</html>
